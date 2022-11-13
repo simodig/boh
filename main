@@ -1,0 +1,191 @@
+#include "particle_type.h"
+#include "resonance_type.h"
+#include "particle.h"
+#include "TMath.h"
+#include "TH1.h"
+#include "TROOT.h"
+#include "TRandom.h"
+#include "TCanvas.h"
+#include "TFile.h"
+
+R__LOAD_LIBRARY(particle_type_cxx.so)
+R__LOAD_LIBRARY(resonance_type_cxx.so)
+R__LOAD_LIBRARY(particle_cxx.so)
+
+void generation() {
+    Particle::AddParticleType("Pione+",0.13957, 1);
+    Particle::AddParticleType("Pione-",0.13957, -1);
+    Particle::AddParticleType("Kaone+",0.49367, 1);
+    Particle::AddParticleType("Kaone-",0.49367, -1);
+    Particle::AddParticleType("Protone+",0.93827, 1);
+    Particle::AddParticleType("Protone-",0.93827, -1);
+    Particle::AddParticleType("K*",0.89166, 0, 0.05);
+
+    gRandom->SetSeed();
+
+    double phi;
+    double theta;
+    double p;
+    double px;
+    double py;
+    double pz;
+    double num;
+    double num2;
+    int counter;
+    Particle particle;
+    Particle other;
+    Particle dau1;
+    Particle dau2;
+
+
+    TH1F* hParticleType = new TH1F("hParticleType", "Type of particle", 7, 0, 7);
+    TH1F* hPolarAngles = new TH1F("hPolarAngles", "Polar angles", 1E3, 0, TMath::Pi());
+    TH1F* hAzimuthAngles = new TH1F("hAzimuthAngles", "Azimuth angles", 1E3, 0, 2*TMath::Pi());
+    TH1F* hMomentum = new TH1F("hMomentum", "Momentum of particles", 1E3, 0, 10);
+    TH1F* hTransverseMomentum = new TH1F("hTransverseMomentum", "Transverse momentum of particles", 1E5, 0, 8);
+    TH1F* hEnergy = new TH1F("hEnergy", "Energy of particles", 1E3, 0, 6);
+    TH1F* hInvMass = new TH1F("hInvMass", "Invariant mass of particles", 1.5E2, 0, 2);
+    hInvMass->Sumw2();
+    TH1F* hInvMassD = new TH1F("hInvMassD", "Invariant mass of particles with discordant charge", 1.5E2, 0, 2);
+    hInvMassD->Sumw2();
+    TH1F* hInvMassC = new TH1F("hInvMassC", "Invariant mass of particles with concordant charge", 1.5E2, 0, 2);
+    hInvMassC->Sumw2();
+    TH1F* hInvMassPKD = new TH1F("hInvMassPKD", "Invariant mass of pions and kaons with discordant charge ", 1.5E2, 0, 2);
+    hInvMassPKD->Sumw2();
+    TH1F* hInvMassPKC = new TH1F("hInvMassPKC", "Invariant mass of pions and kaons with concordant charge", 1.5E2, 0, 2);
+    hInvMassPKC->Sumw2();
+    TH1F* hInvMassResonance = new TH1F("hInvMassResonance", "Invariant mass of decayed particles", 1.5E2, 0, 2);
+    hInvMassResonance->Sumw2();
+    
+
+    Particle EventParticles[120];
+    for (int j = 0; j < 1E5; ++j) {
+        counter = 0;
+        for (int i = 0; i<100; ++i) {
+            dau1.Set_Index(4);
+            dau2.Set_Index(4);
+            phi = gRandom->Uniform(0, 2*TMath::Pi());
+            theta = gRandom -> Uniform(0, TMath::Pi());
+            p = gRandom -> Exp(1);
+            
+            px = p * TMath::Cos(phi)*TMath::Sin(theta);
+            py = p * TMath::Sin(phi)*TMath::Sin(theta);
+            pz = p * TMath::Cos(theta);
+
+            particle.Set_P(px, py, pz);
+
+            num = gRandom -> Rndm();
+            if (num < 0.4) {particle.Set_Index("Pione+");}
+            else if (num < 0.8) {particle.Set_Index("Pione-");}
+            else if (num < 0.85) {particle.Set_Index("Kaone+");}
+            else if (num < 0.90) {particle.Set_Index("Kaone-");}
+            else if (num < 0.945) {particle.Set_Index("Protone+");}
+            else if (num < 0.99) {particle.Set_Index("Protone-");}
+            else {particle.Set_Index("K*");}
+
+            EventParticles[i] = particle;
+
+            if (particle.Get_fIndex()==6) { 
+                num2 = gRandom -> Rndm();
+                if (num2 < 0.5) {
+                    dau1.Set_Index("Pione+");
+                    dau2.Set_Index("Kaone-");}
+                else {
+                    dau1.Set_Index("Pione-");
+                    dau2.Set_Index("Kaone+");
+                    }
+                particle.Decay2body(dau1,dau2); 
+                /*num2 = gRandom -> Rndm();
+                if (num2 < 0.5) {
+                    dau1.Set_Index("Pione+");
+                    dau2.Set_Index("Kaone-");}
+                else {
+                    dau1.Set_Index("Pione-");
+                    dau2.Set_Index("Kaone+");
+                    }*/
+                EventParticles[100+counter] = dau1;
+                EventParticles[101+counter] = dau2;
+                counter+=2;
+            }
+
+            hParticleType -> Fill(particle.Get_fIndex());
+            hPolarAngles -> Fill(theta);
+            hAzimuthAngles -> Fill(phi);
+            hMomentum ->Fill(p);
+            hTransverseMomentum -> Fill( TMath::Sqrt (px*px+py*py));
+            hEnergy -> Fill(particle.Get_Energy());
+
+            if (dau1.Get_fIndex() != 4 && dau2.Get_fIndex() != 4) {
+                hInvMassResonance -> Fill(dau1.InvMass(dau2));
+            }
+        }
+        
+        for (int n = 1; n < 100+counter; ++n) {
+            for (int k = 0; k < n; ++k) {
+                particle = EventParticles[n];
+                other = EventParticles[k];
+                hInvMass -> Fill(particle.InvMass(other));
+                if (particle.GetParticleCharge() * other.GetParticleCharge() < 0) {
+                    hInvMassD -> Fill(particle.InvMass(other));
+                    if (particle.Get_Mass()+other.Get_Mass() == 0.63324) {
+                        hInvMassPKD -> Fill(particle.InvMass(other));
+                        }
+                    }
+                if (particle.GetParticleCharge() * other.GetParticleCharge() > 0) {
+                    hInvMassC -> Fill(particle.InvMass(other));
+                    if (particle.Get_Mass()+other.Get_Mass() == 0.63324) {
+                        hInvMassPKC -> Fill(particle.InvMass(other));
+                        }
+                    }
+                //if (n > 100 && n%2 != 0) {
+                  //  hInvMassResonance -> Fill(particle.InvMass(EventParticles[n-1]));
+                   // }
+                }
+            }
+        }
+    TCanvas* c[12];
+    for (int i = 0; i < 12; ++i) {
+        c[i] = new TCanvas;
+    }
+    c[0] -> cd();
+    hParticleType -> Draw("HIST");
+    c[1] -> cd();
+    hPolarAngles -> Draw("HIST");
+    c[2] -> cd();
+    hAzimuthAngles -> Draw("HIST");
+    c[3] -> cd();
+    hMomentum -> Draw("HIST");
+    c[4] -> cd();
+    hTransverseMomentum -> Draw("HIST");
+    c[5] -> cd();
+    hEnergy -> Draw("HIST");
+    c[6] -> cd();
+    hInvMass -> Draw("HIST");
+    c[7] -> cd();
+    hInvMassD -> Draw("HIST");
+    c[8] -> cd();
+    hInvMassC -> Draw("HIST");
+    c[9] -> cd();
+    hInvMassPKC -> Draw("HIST");
+    c[10] -> cd();
+    hInvMassPKD -> Draw("HIST");
+    c[11] -> cd();
+    hInvMassResonance -> Draw("HIST");
+
+    TFile* f = new TFile("analysis.root", "RECREATE");
+    hParticleType -> Write();
+    hPolarAngles -> Write();
+    hAzimuthAngles -> Write();
+    hMomentum -> Write ();
+    hTransverseMomentum -> Write();
+    hEnergy -> Write ();
+    hInvMass -> Write ();
+    hInvMassC -> Write ();
+    hInvMassD -> Write ();
+    hInvMassPKC -> Write ();
+    hInvMassPKD -> Write ();
+    hInvMassResonance -> Write ();
+    f -> Close();
+    }
+
+    
